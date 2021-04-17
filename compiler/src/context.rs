@@ -18,14 +18,17 @@
 //
 
 use std;
+use std::mem;
+use std::fs::File;
 use std::collections::HashMap;
+
+use core::bin_structs::{Header, FuncRef, GlobRef};
+use core::bin_reader::BinReader;
 
 use crate::func::Func;
 use crate::glob::{Glob, GlobalValue};
 use crate::instruction::Instruction;
 use crate::out_bin::OutBin;
-use std::fs::File;
-use std::io::Read;
 
 pub struct Context {
     funcs: HashMap<String, Func>,
@@ -124,19 +127,56 @@ impl Context {
     }
 
     pub fn load_binary(&self, file_name: &str) -> Result<(), String> {
-        let mut bin_data = vec![];
-
-        let mut bin_file = match File::open(file_name) {
+        let bin_file = match File::open(file_name) {
             Ok(bin_file) => bin_file,
             Err(error) => return Err(String::from(format!("Failed to open binary file\n{}", error.to_string())))
         };
 
-        match bin_file.read_to_end(&mut bin_data) {
-            Ok(_) => { }
-            Err(error) => return Err(String::from(format!("Failed to read binary file\n{}", error.to_string())))
+        let mut bin_reader = BinReader::new(bin_file);
+
+        let header = match Header::from_stream(&mut bin_reader) {
+            Ok(header) => header,
+            Err(error) => return Err(String::from(format!("Failed to parse binary header\n{}", error)))
         };
 
-        // TODO deserialize bytes from bin_data
+        let mut str_table = vec![0; header.str_tab_size as usize];
+        bin_reader.read_bytes(&mut str_table)?;
+
+        let mut func_refs = vec![];
+        let func_count = header.func_tab_size / mem::size_of::<FuncRef>() as u32;
+        for _func_ref_idx in 0..func_count {
+            let func_ref = match FuncRef::from_stream(&mut bin_reader) {
+                Ok(func_ref) => func_ref,
+                Err(error) => return Err(String::from(format!("Failed to parse func ref\n{}", error)))
+            };
+            func_refs.push(func_ref);
+        }
+        assert!(func_refs.len() == func_count as usize);
+
+        let mut glob_refs = vec![];
+        let glob_count = header.glob_tab_size / mem::size_of::<GlobRef>() as u32;
+        for _glob_ref_idx in 0..glob_count {
+            let glob_ref = match GlobRef::from_stream(&mut bin_reader) {
+                Ok(glob_ref) => glob_ref,
+                Err(error) => return Err(String::from(format!("Failed to parse glob ref\n{}", error)))
+            };
+            glob_refs.push(glob_ref);
+        }
+        assert!(glob_refs.len() == glob_count as usize);
+
+        let mut code = vec![0; header.code_size as usize];
+        bin_reader.read_bytes(&mut code)?;
+
+        let mut glob_data = vec![0; header.glob_size as usize];
+        bin_reader.read_bytes(&mut glob_data)?;
+
+        for _func_ref in func_refs.iter() {
+            // TODO parse string as a name for this function
+        }
+
+        for _glob_ref in glob_refs.iter() {
+            // TODO parse string as a name for this function
+        }
 
         Ok(())
     }

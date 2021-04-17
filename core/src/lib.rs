@@ -19,3 +19,4 @@
 
 pub mod opcodes;
 pub mod bin_structs;
+pub mod bin_reader;

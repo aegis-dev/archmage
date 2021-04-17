@@ -18,6 +18,7 @@
 //
 
 use std::mem;
+use crate::bin_reader::BinReader;
 
 #[repr(packed)]
 pub struct Header {
@@ -71,16 +72,54 @@ impl Header {
             glob_size: 0
         }
     }
+
+    pub fn from_stream(bin_reader: &mut BinReader) -> Result<Header, String> {
+        let mut magic: [u8; 8] = [0; 8];
+        bin_reader.read_bytes(&mut magic)?;
+        Ok(Header {
+            magic,
+            header_size: bin_reader.read_u16()?,
+            checksum: bin_reader.read_u32()?,
+            file_size: bin_reader.read_u64()?,
+            str_tab_offset: bin_reader.read_u64()?,
+            str_tab_size: bin_reader.read_u32()?,
+            func_tab_offset: bin_reader.read_u64()?,
+            func_tab_size: bin_reader.read_u32()?,
+            glob_tab_offset: bin_reader.read_u64()?,
+            glob_tab_size: bin_reader.read_u32()?,
+            code_offset: bin_reader.read_u64()?,
+            code_size: bin_reader.read_u32()?,
+            glob_offset: bin_reader.read_u64()?,
+            glob_size: bin_reader.read_u32()?,
+        })
+    }
 }
 
 impl FuncRef {
     pub fn new(name_idx: u32) -> FuncRef {
         FuncRef { name_idx, offset: 0, size: 0, result_count: 0 }
     }
+
+    pub fn from_stream(bin_reader: &mut BinReader) -> Result<FuncRef, String> {
+        Ok(FuncRef {
+            name_idx: bin_reader.read_u32()?,
+            offset: bin_reader.read_u64()?,
+            size: bin_reader.read_u32()?,
+            result_count: bin_reader.read_u8()?
+        })
+    }
 }
 
 impl GlobRef {
     pub fn new(name_idx: u32) -> GlobRef {
         GlobRef { name_idx, offset: 0, size: 0 }
+    }
+
+    pub fn from_stream(bin_reader: &mut BinReader) -> Result<GlobRef, String> {
+        Ok(GlobRef {
+            name_idx: bin_reader.read_u32()?,
+            offset: bin_reader.read_u64()?,
+            size: bin_reader.read_u32()?,
+        })
     }
 }
