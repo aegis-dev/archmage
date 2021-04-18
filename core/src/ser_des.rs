@@ -17,7 +17,11 @@
 // along with Archmage. If not, see <https://www.gnu.org/licenses/>.
 //
 
-pub mod opcodes;
-pub mod bin_structs;
-pub mod ser_des;
-pub mod bin_utils;
+use std::io::BufReader;
+use std::fs::File;
+
+pub trait SerDes<T> {
+    fn deserialize(reader: &mut BufReader<File>) -> Result<T, String>;
+
+    fn serialize(&self) -> Vec<u8>;
+}

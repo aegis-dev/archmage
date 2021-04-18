@@ -23,12 +23,14 @@ use std::fs::File;
 use std::collections::HashMap;
 
 use core::bin_structs::{Header, FuncRef, GlobRef};
-use core::bin_reader::BinReader;
 
 use crate::func::Func;
 use crate::glob::{Glob, GlobalValue};
 use crate::instruction::Instruction;
 use crate::out_bin::OutBin;
+use core::ser_des::SerDes;
+use std::io::BufReader;
+use core::bin_utils;
 
 pub struct Context {
     funcs: HashMap<String, Func>,
@@ -126,26 +128,26 @@ impl Context {
         bin.write(&mut bin_file)
     }
 
-    pub fn load_binary(&self, file_name: &str) -> Result<(), String> {
+    pub fn load_binary(&mut self, file_name: &str) -> Result<(), String> {
         let bin_file = match File::open(file_name) {
             Ok(bin_file) => bin_file,
             Err(error) => return Err(String::from(format!("Failed to open binary file\n{}", error.to_string())))
         };
 
-        let mut bin_reader = BinReader::new(bin_file);
+        let mut bin_reader = BufReader::new(bin_file);
 
-        let header = match Header::from_stream(&mut bin_reader) {
+        let header = match Header::deserialize(&mut bin_reader) {
             Ok(header) => header,
             Err(error) => return Err(String::from(format!("Failed to parse binary header\n{}", error)))
         };
 
         let mut str_table = vec![0; header.str_tab_size as usize];
-        bin_reader.read_bytes(&mut str_table)?;
+        bin_utils::read_bytes(&mut bin_reader, &mut str_table)?;
 
         let mut func_refs = vec![];
         let func_count = header.func_tab_size / mem::size_of::<FuncRef>() as u32;
         for _func_ref_idx in 0..func_count {
-            let func_ref = match FuncRef::from_stream(&mut bin_reader) {
+            let func_ref = match FuncRef::deserialize(&mut bin_reader) {
                 Ok(func_ref) => func_ref,
                 Err(error) => return Err(String::from(format!("Failed to parse func ref\n{}", error)))
             };
@@ -156,7 +158,7 @@ impl Context {
         let mut glob_refs = vec![];
         let glob_count = header.glob_tab_size / mem::size_of::<GlobRef>() as u32;
         for _glob_ref_idx in 0..glob_count {
-            let glob_ref = match GlobRef::from_stream(&mut bin_reader) {
+            let glob_ref = match GlobRef::deserialize(&mut bin_reader) {
                 Ok(glob_ref) => glob_ref,
                 Err(error) => return Err(String::from(format!("Failed to parse glob ref\n{}", error)))
             };
@@ -165,19 +167,48 @@ impl Context {
         assert!(glob_refs.len() == glob_count as usize);
 
         let mut code = vec![0; header.code_size as usize];
-        bin_reader.read_bytes(&mut code)?;
+        bin_utils::read_bytes(&mut bin_reader, &mut code)?;
 
         let mut glob_data = vec![0; header.glob_size as usize];
-        bin_reader.read_bytes(&mut glob_data)?;
+        bin_utils::read_bytes(&mut bin_reader, &mut glob_data)?;
 
-        for _func_ref in func_refs.iter() {
-            // TODO parse string as a name for this function
+        for func_ref in func_refs.iter() {
+            let func_name = Context::str_from_table(&str_table, func_ref.name_idx)?;
+            self.make_func(&func_name, func_ref.result_count)?;
         }
 
-        for _glob_ref in glob_refs.iter() {
-            // TODO parse string as a name for this function
+        for _func_ref in func_refs.iter() {
+            //decode instructions
+        }
+
+        for glob_ref in glob_refs.iter() {
+            let glob_name = Context::str_from_table(&str_table, glob_ref.name_idx)?;
+            self.make_glob(&glob_name)?;
         }
 
         Ok(())
+    }
+
+    fn str_from_table(str_table: &Vec<u8>, offset: u32) -> Result<String, String> {
+        let mut str_bytes = vec![];
+        let mut idx = offset as usize;
+        'str_parse: loop {
+            match str_table.get(idx) {
+                Some(byte) => {
+                    if *byte == '\0' as u8 {
+                        break 'str_parse;
+                    }
+                    str_bytes.push(*byte);
+                }
+                None => {
+                    return Err(String::from(format!("Failed to parse string from string table at offset of '{}'", offset)))
+                }
+            };
+            idx += 1;
+        }
+        match String::from_utf8(str_bytes) {
+            Ok(string) => Ok(string),
+            Err(_) =>  Err(String::from(format!("Failed to parse string from string table at offset of '{}'", offset)))
+        }
     }
 }

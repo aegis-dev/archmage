@@ -18,7 +18,11 @@
 //
 
 use std::mem;
-use crate::bin_reader::BinReader;
+use std::io::BufReader;
+use std::fs::File;
+
+use crate::bin_utils;
+use crate::ser_des::SerDes;
 
 #[repr(packed)]
 pub struct Header {
@@ -51,6 +55,7 @@ pub struct GlobRef {
     pub name_idx: u32,
     pub offset: u64,
     pub size: u32,
+    pub value_type: u8,
 }
 
 impl Header {
@@ -72,26 +77,48 @@ impl Header {
             glob_size: 0
         }
     }
+}
 
-    pub fn from_stream(bin_reader: &mut BinReader) -> Result<Header, String> {
+impl SerDes<Header> for Header {
+    fn deserialize(reader: &mut BufReader<File>) -> Result<Header, String> {
         let mut magic: [u8; 8] = [0; 8];
-        bin_reader.read_bytes(&mut magic)?;
+        bin_utils::read_bytes(reader, &mut magic)?;
         Ok(Header {
             magic,
-            header_size: bin_reader.read_u16()?,
-            checksum: bin_reader.read_u32()?,
-            file_size: bin_reader.read_u64()?,
-            str_tab_offset: bin_reader.read_u64()?,
-            str_tab_size: bin_reader.read_u32()?,
-            func_tab_offset: bin_reader.read_u64()?,
-            func_tab_size: bin_reader.read_u32()?,
-            glob_tab_offset: bin_reader.read_u64()?,
-            glob_tab_size: bin_reader.read_u32()?,
-            code_offset: bin_reader.read_u64()?,
-            code_size: bin_reader.read_u32()?,
-            glob_offset: bin_reader.read_u64()?,
-            glob_size: bin_reader.read_u32()?,
+            header_size: bin_utils::read_u16(reader)?,
+            checksum: bin_utils::read_u32(reader)?,
+            file_size: bin_utils::read_u64(reader)?,
+            str_tab_offset: bin_utils::read_u64(reader)?,
+            str_tab_size: bin_utils::read_u32(reader)?,
+            func_tab_offset: bin_utils::read_u64(reader)?,
+            func_tab_size: bin_utils::read_u32(reader)?,
+            glob_tab_offset: bin_utils::read_u64(reader)?,
+            glob_tab_size: bin_utils::read_u32(reader)?,
+            code_offset: bin_utils::read_u64(reader)?,
+            code_size: bin_utils::read_u32(reader)?,
+            glob_offset: bin_utils::read_u64(reader)?,
+            glob_size: bin_utils::read_u32(reader)?,
         })
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        bytes.extend_from_slice(&self.magic);
+        bytes.extend_from_slice(&self.header_size.to_le_bytes());
+        bytes.extend_from_slice(&self.checksum.to_le_bytes());
+        bytes.extend_from_slice(&self.file_size.to_le_bytes());
+        bytes.extend_from_slice(&self.str_tab_offset.to_le_bytes());
+        bytes.extend_from_slice(&self.str_tab_size.to_le_bytes());
+        bytes.extend_from_slice(&self.func_tab_offset.to_le_bytes());
+        bytes.extend_from_slice(&self.func_tab_size.to_le_bytes());
+        bytes.extend_from_slice(&self.glob_tab_offset.to_le_bytes());
+        bytes.extend_from_slice(&self.glob_tab_size.to_le_bytes());
+        bytes.extend_from_slice(&self.code_offset.to_le_bytes());
+        bytes.extend_from_slice(&self.code_size.to_le_bytes());
+        bytes.extend_from_slice(&self.glob_offset.to_le_bytes());
+        bytes.extend_from_slice(&self.glob_size.to_le_bytes());
+
+        bytes
     }
 }
 
@@ -99,27 +126,52 @@ impl FuncRef {
     pub fn new(name_idx: u32) -> FuncRef {
         FuncRef { name_idx, offset: 0, size: 0, result_count: 0 }
     }
+}
 
-    pub fn from_stream(bin_reader: &mut BinReader) -> Result<FuncRef, String> {
+impl SerDes<FuncRef> for FuncRef {
+    fn deserialize(reader: &mut BufReader<File>) -> Result<FuncRef, String> {
         Ok(FuncRef {
-            name_idx: bin_reader.read_u32()?,
-            offset: bin_reader.read_u64()?,
-            size: bin_reader.read_u32()?,
-            result_count: bin_reader.read_u8()?
+            name_idx: bin_utils::read_u32(reader)?,
+            offset: bin_utils::read_u64(reader)?,
+            size: bin_utils::read_u32(reader)?,
+            result_count: bin_utils::read_u8(reader)?
         })
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        bytes.extend_from_slice(&self.name_idx.to_le_bytes());
+        bytes.extend_from_slice(&self.offset.to_le_bytes());
+        bytes.extend_from_slice(&self.size.to_le_bytes());
+        bytes.extend_from_slice(&self.result_count.to_le_bytes());
+
+        bytes
     }
 }
 
 impl GlobRef {
     pub fn new(name_idx: u32) -> GlobRef {
-        GlobRef { name_idx, offset: 0, size: 0 }
+        GlobRef { name_idx, offset: 0, size: 0, value_type: 0 }
+    }
+}
+
+impl SerDes<GlobRef> for GlobRef {
+    fn deserialize(reader: &mut BufReader<File>) -> Result<GlobRef, String> {
+        Ok(GlobRef {
+            name_idx: bin_utils::read_u32(reader)?,
+            offset: bin_utils::read_u64(reader)?,
+            size: bin_utils::read_u32(reader)?,
+            value_type: bin_utils::read_u8(reader)?,
+        })
     }
 
-    pub fn from_stream(bin_reader: &mut BinReader) -> Result<GlobRef, String> {
-        Ok(GlobRef {
-            name_idx: bin_reader.read_u32()?,
-            offset: bin_reader.read_u64()?,
-            size: bin_reader.read_u32()?,
-        })
+    fn serialize(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        bytes.extend_from_slice(&self.name_idx.to_le_bytes());
+        bytes.extend_from_slice(&self.offset.to_le_bytes());
+        bytes.extend_from_slice(&self.size.to_le_bytes());
+        bytes.extend_from_slice(&self.value_type.to_le_bytes());
+
+        bytes
     }
 }

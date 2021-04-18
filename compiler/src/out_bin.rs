@@ -24,6 +24,7 @@ use crate::glob::Glob;
 use std::fs::File;
 use std::mem;
 use std::io::Write;
+use core::ser_des::SerDes;
 
 pub struct OutBin {
     str_table: Vec<u8>,
@@ -66,17 +67,15 @@ impl OutBin {
         header.file_size = header.glob_offset + header.glob_size as u64;
         header.checksum = 0; // TODO: update checksum
 
-        unsafe {
-            OutBin::write_bytes(file, OutBin::as_u8_slice(&header))?;
-        }
+
+        OutBin::write_bytes(file, &header.serialize())?;
+
         OutBin::write_bytes(file, &self.str_table)?;
-        unsafe {
-            for func_ref in self.funcs_table.iter() {
-                OutBin::write_bytes(file, OutBin::as_u8_slice(&func_ref))?;
-            }
-            for glob_ref in self.globs_table.iter() {
-                OutBin::write_bytes(file, OutBin::as_u8_slice(&glob_ref))?;
-            }
+        for func_ref in self.funcs_table.iter() {
+            OutBin::write_bytes(file, &func_ref.serialize())?;
+        }
+        for glob_ref in self.globs_table.iter() {
+            OutBin::write_bytes(file, &glob_ref.serialize())?;
         }
         OutBin::write_bytes(file, &self.funcs_code)?;
         OutBin::write_bytes(file, &self.globs_data)?;
@@ -149,10 +148,10 @@ impl OutBin {
         let global_idx = *self.get_glob_idx(name)?;
         self.globs_table.get_mut(global_idx as usize)
     }
-
-    unsafe fn as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-        std::slice::from_raw_parts((p as *const T) as *const u8, std::mem::size_of::<T>(),)
-    }
+    //
+    // unsafe fn as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    //     std::slice::from_raw_parts((p as *const T) as *const u8, std::mem::size_of::<T>())
+    // }
 
     fn write_bytes(file: &mut File, bytes: &[u8]) -> Result<(), String> {
         match file.write(bytes) {
