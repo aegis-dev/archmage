@@ -56,19 +56,11 @@ impl Func {
     pub fn encode(&self, bin: &mut OutBin) -> Result<(), String> {
         let mut code: Vec<u8> = vec![];
 
-        let mut label_dests: HashMap<String, u32> = HashMap::new();
-        let mut jumps_to_update: HashMap<u32, String>  = HashMap::new();
+        let mut label_dests: HashMap<String, u64> = HashMap::new();
+        let mut jumps_to_update: HashMap<u64, String>  = HashMap::new();
+
         for instruction in self.code.iter() {
-            instruction.encode(&mut code, &bin)?;
-            match instruction.get_literal() {
-                Literal::Label(label) => {
-                    label_dests.insert(label.clone(), code.len() as u32);
-                }
-                Literal::Jump(label_dest) => {
-                    jumps_to_update.insert((code.len() - 1) as u32, label_dest.clone());
-                }
-                _ => {}
-            }
+            instruction.encode(&mut code, &bin, &mut label_dests, &mut jumps_to_update)?;
         }
 
         for (offset, label_dest) in jumps_to_update.iter() {
@@ -76,10 +68,14 @@ impl Func {
                 Some(dest_offset) => {
                     let bytes = dest_offset.to_le_bytes();
                     let offset_as_idx = *offset as usize;
-                    code[offset_as_idx] = bytes[0];
+                    code[offset_as_idx + 0] = bytes[0];
                     code[offset_as_idx + 1] = bytes[1];
                     code[offset_as_idx + 2] = bytes[2];
                     code[offset_as_idx + 3] = bytes[3];
+                    code[offset_as_idx + 4] = bytes[4];
+                    code[offset_as_idx + 5] = bytes[5];
+                    code[offset_as_idx + 6] = bytes[6];
+                    code[offset_as_idx + 7] = bytes[7];
                 }
                 None => {
                     return Err(String::from(format!("Unknown label '{0}' in method {1}", label_dest, self.get_name())));

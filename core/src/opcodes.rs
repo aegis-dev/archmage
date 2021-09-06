@@ -17,8 +17,10 @@
 // along with Archmage. If not, see <https://www.gnu.org/licenses/>.
 //
 
+use num_enum::TryFromPrimitive;
+
 #[repr(u8)]
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, TryFromPrimitive)]
 pub enum Opcode {
     Nop = 0x00,
     Return = 0x01,

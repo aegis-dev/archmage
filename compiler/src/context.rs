@@ -20,17 +20,19 @@
 use std;
 use std::mem;
 use std::fs::File;
-use std::collections::HashMap;
+use std::io::BufReader;
+use std::collections::{HashMap, BTreeMap};
 
 use core::bin_structs::{Header, FuncRef, GlobRef};
+use core::byte_vec_reader::ByteVecReader;
+use core::bin_utils;
+use core::ser_des::SerDes;
 
 use crate::func::Func;
 use crate::glob::{Glob, GlobalValue};
-use crate::instruction::Instruction;
+use crate::instruction::{Instruction, Literal};
 use crate::out_bin::OutBin;
-use core::ser_des::SerDes;
-use std::io::BufReader;
-use core::bin_utils;
+use core::opcodes::Opcode;
 
 pub struct Context {
     funcs: HashMap<String, Func>,
@@ -172,19 +174,37 @@ impl Context {
         let mut glob_data = vec![0; header.glob_size as usize];
         bin_utils::read_bytes(&mut bin_reader, &mut glob_data)?;
 
-        for func_ref in func_refs.iter() {
+        let mut func_name_map = HashMap::new();
+        for func_ref_idx in 0..func_refs.len() {
+            let func_ref = func_refs.get(func_ref_idx).unwrap(); // just unwrap - it is safe
             let func_name = Context::str_from_table(&str_table, func_ref.name_idx)?;
             self.make_func(&func_name, func_ref.result_count)?;
+            func_name_map.insert(func_ref_idx as u32, func_name.clone());
         }
 
-        for _func_ref in func_refs.iter() {
-            //decode instructions
-        }
-
-        for glob_ref in glob_refs.iter() {
+        let mut glob_name_map = HashMap::new();
+        for glob_ref_idx in 0..glob_refs.len() {
+            let glob_ref = glob_refs.get(glob_ref_idx).unwrap();  // just unwrap - it is safe
             let glob_name = Context::str_from_table(&str_table, glob_ref.name_idx)?;
             self.make_glob(&glob_name)?;
+            glob_name_map.insert(glob_ref_idx as u32, glob_name.clone());
         }
+
+        let mut code_reader = ByteVecReader::new(code);
+        for func_ref in func_refs.iter() {
+            code_reader.set_current_byte_idx(func_ref.offset as usize);
+
+            let mut instructions = vec![];
+            let mut bytes_decoded = 0;
+            while bytes_decoded < func_ref.size {
+                let (instruction, instruction_size) = Instruction::decode(&mut code_reader, &func_name_map, &glob_name_map)?;
+                bytes_decoded += instruction_size as u32;
+                instructions.push(instruction);
+            }
+            assert!(bytes_decoded == func_ref.size);
+        }
+
+        // TODO decode globs data
 
         Ok(())
     }
