@@ -75,3 +75,26 @@ pub fn read_bytes(reader: &mut BufReader<File>, bytes: &mut [u8]) -> Result<(), 
         Err(_) => Err(String::from("Failed to read bytes"))
     }
 }
+
+pub fn str_from_table(str_table: &Vec<u8>, offset: u32) -> Result<String, String> {
+    let mut str_bytes = vec![];
+    let mut idx = offset as usize;
+    'str_parse: loop {
+        match str_table.get(idx) {
+            Some(byte) => {
+                if *byte == '\0' as u8 {
+                    break 'str_parse;
+                }
+                str_bytes.push(*byte);
+            }
+            None => {
+                return Err(String::from(format!("Failed to parse string from string table at offset of '{}'", offset)))
+            }
+        };
+        idx += 1;
+    }
+    match String::from_utf8(str_bytes) {
+        Ok(string) => Ok(string),
+        Err(_) =>  Err(String::from(format!("Failed to parse string from string table at offset of '{}'", offset)))
+    }
+}

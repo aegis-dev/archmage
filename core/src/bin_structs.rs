@@ -43,6 +43,7 @@ pub struct Header {
 }
 
 #[repr(packed)]
+#[derive(Clone, Copy)]
 pub struct FuncRef {
     pub name_idx: u32,
     pub offset: u64,
@@ -51,6 +52,7 @@ pub struct FuncRef {
 }
 
 #[repr(packed)]
+#[derive(Clone, Copy)]
 pub struct GlobRef {
     pub name_idx: u32,
     pub offset: u64,

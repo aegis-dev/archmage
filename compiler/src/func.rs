@@ -19,7 +19,7 @@
 
 use std::collections::HashMap;
 
-use crate::instruction::{Instruction, Literal};
+use crate::instruction::Instruction;
 use crate::out_bin::OutBin;
 
 pub struct Func {

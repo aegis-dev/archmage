@@ -244,6 +244,11 @@ impl Instruction {
 
         code.push(self.opcode as u8);
 
+        if Opcode::is_opcode_instruction(self.opcode) {
+            // No literal - return
+            return Ok(());
+        }
+
         match &self.literal {
             Literal::None() => { }
             Literal::Label(_) => {
