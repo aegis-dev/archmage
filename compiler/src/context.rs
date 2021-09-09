@@ -24,7 +24,7 @@ use std::io::BufReader;
 use std::collections::{HashMap, BTreeMap};
 
 use core::bin_structs::{Header, FuncRef, GlobRef};
-use core::byte_vec_reader::ByteVecReader;
+use core::byte_vec::ByteVec;
 use core::bin_utils;
 use core::ser_des::SerDes;
 use core::opcodes::Opcode;

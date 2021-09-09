@@ -29,7 +29,7 @@ use std::convert::TryFrom;
 
 use core::ser_des::SerDes;
 use core::bin_utils;
-use core::byte_vec_reader::ByteVecReader;
+use core::byte_vec::ByteVec;
 use core::bin_structs::{Header, FuncRef, GlobRef};
 use core::opcodes::Opcode;
 
@@ -37,28 +37,31 @@ use crate::stack::Stack;
 
 
 pub struct VM {
-    code: ByteVecReader,
-    glob_data: Vec<u8>,
+    code: ByteVec,
+    code_size: usize,
+    glob_data: ByteVec,
+    glob_data_size: usize,
     func_refs: Vec<FuncRef>,
     glob_refs: Vec<GlobRef>,
     func_map: HashMap<String, FuncRef>,
     glob_map: HashMap<String, GlobRef>,
     stack: Stack,
-    heap: Vec<u8>,
+    heap: ByteVec,
+    heap_size: u32,
     callstack: Vec<usize>,
 }
 
 impl VM {
-    pub fn init_from_file(file_name: &str) -> Result<VM, String> {
+    pub fn init_from_file(file_name: &str, heap_size: u32) -> Result<VM, String> {
         let bin_file = match File::open(file_name) {
             Ok(bin_file) => bin_file,
             Err(error) => return Err(String::from(format!("Failed to open binary file\n{}", error.to_string())))
         };
 
-        VM::init(BufReader::new(bin_file))
+        VM::init(BufReader::new(bin_file), heap_size)
     }
 
-    pub fn init(bin_reader: BufReader<File>) -> Result<VM, String>  {
+    pub fn init(bin_reader: BufReader<File>, heap_size: u32) -> Result<VM, String>  {
         let mut bin_reader = bin_reader;
 
         let header = match Header::deserialize(&mut bin_reader) {
@@ -107,14 +110,17 @@ impl VM {
 
         Ok(
             VM {
-                code: ByteVecReader::new(code),
-                glob_data,
+                code: ByteVec::new(code),
+                code_size: header.code_size as usize,
+                glob_data: ByteVec::new(glob_data),
+                glob_data_size: header.glob_size as usize,
                 func_refs,
                 glob_refs,
                 func_map,
                 glob_map,
                 stack: Stack::new(),
-                heap: vec![],
+                heap: ByteVec::new(vec![0; heap_size as usize]),
+                heap_size,
                 callstack: vec![]
             }
         )
@@ -155,7 +161,7 @@ impl VM {
                         None => return Err(String::from(format!("Unexpected func idx '{:X}'", func_idx)))
                     };
 
-                    self.execute_func(func_ref)?
+                    self.execute_func(func_ref)?;
                 }
                 Opcode::Jump => {
                     let offset = self.code.read_u64()?;
@@ -172,93 +178,686 @@ impl VM {
                 }
                 Opcode::StackGet => {
                     let stack_offset = self.code.read_u64()?;
-                    self.stack.push(self.stack.get(stack_offset)?)
+                    let value = self.stack.get(stack_offset)?;
+                    self.stack.push(value)?;
                 }
                 Opcode::StackSet => {
                     let value = self.stack.get(0)?;
                     let stack_offset = self.code.read_u64()?;
-                    self.stack.push(self.stack.set(stack_offset, value)?)
+                    self.stack.set(stack_offset, value)?;
                 }
                 Opcode::I64Const => {
                     let value = self.code.read_u64()?;
-                    self.stack.push(value);
+                    self.stack.push(value)?;
                 }
                 Opcode::F64Const => {
                     let value = self.code.read_u64()?;
-                    self.stack.push(value);
+                    self.stack.push(value)?;
                 }
-                Opcode::I8Load => {}
-                Opcode::I8LoadC => {}
-                Opcode::I16Load => {}
-                Opcode::I16LoadC => {}
-                Opcode::I32Load => {}
-                Opcode::I32LoadC => {}
-                Opcode::I64Load => {}
-                Opcode::I64LoadC => {}
-                Opcode::F32Load => {}
-                Opcode::F32LoadC => {}
-                Opcode::F64Load => {}
-                Opcode::F64LoadC => {}
-                Opcode::I8Store => {}
-                Opcode::I8StoreC => {}
-                Opcode::I16Store => {}
-                Opcode::I16StoreC => {}
-                Opcode::I32Store => {}
-                Opcode::I32StoreC => {}
-                Opcode::I64Store => {}
-                Opcode::I64StoreC => {}
-                Opcode::F32Store => {}
-                Opcode::F32StoreC => {}
-                Opcode::F64Store => {}
-                Opcode::F64StoreC => {}
-                Opcode::I64Eqz => {}
-                Opcode::I64Eq => {}
-                Opcode::I64Ne => {}
-                Opcode::I64LtS => {}
-                Opcode::I64LtU => {}
-                Opcode::I64GtS => {}
-                Opcode::I64GtU => {}
-                Opcode::I64LeS => {}
-                Opcode::I64LeU => {}
-                Opcode::I64GeS => {}
-                Opcode::I64GeU => {}
-                Opcode::F64Eq => {}
-                Opcode::F64Ne => {}
-                Opcode::F64Lt => {}
-                Opcode::F64Gt => {}
-                Opcode::F64Le => {}
-                Opcode::F64Ge => {}
-                Opcode::I64Add => {}
-                Opcode::I64Sub => {}
-                Opcode::I64Mul => {}
-                Opcode::I64DivS => {}
-                Opcode::I64DivU => {}
-                Opcode::I64RemS => {}
-                Opcode::I64RemU => {}
-                Opcode::I64Pow => {}
-                Opcode::I64Abs => {}
-                Opcode::I64Sqrt => {}
-                Opcode::I64And => {}
-                Opcode::I64Or => {}
-                Opcode::I64Xor => {}
-                Opcode::I64Shl => {}
-                Opcode::I64ShrS => {}
-                Opcode::I64ShrU => {}
-                Opcode::I64Rotl => {}
-                Opcode::I64Rotr => {}
-                Opcode::F64Add => {}
-                Opcode::F64Sub => {}
-                Opcode::F64Mul => {}
-                Opcode::F64Div => {}
-                Opcode::F64Pow => {}
-                Opcode::F64Abs => {}
-                Opcode::F64Ceil => {}
-                Opcode::F64Floor => {}
-                Opcode::F64Trunc => {}
-                Opcode::F64Nearest => {}
-                Opcode::F64Sqrt => {}
+                Opcode::I8Load => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    let value = self.glob_data.read_u8()?;
+                    self.stack.push(value as u64)?;
+                }
+                Opcode::I8LoadC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.read_u8()?
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.read_u8()?
+                        }
+                    };
+
+                    self.stack.push(value as u64)?;
+                }
+                Opcode::I16Load => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    let value = self.glob_data.read_u16()?;
+                    self.stack.push(value as u64)?;
+                }
+                Opcode::I16LoadC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.read_u16()?
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.read_u16()?
+                        }
+                    };
+
+                    self.stack.push(value as u64)?;
+                }
+                Opcode::I32Load => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    let value = self.glob_data.read_u32()?;
+                    self.stack.push(value as u64)?;
+                }
+                Opcode::I32LoadC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.read_u32()?
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.read_u32()?
+                        }
+                    };
+
+                    self.stack.push(value as u64)?;
+                }
+                Opcode::I64Load => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    let value = self.glob_data.read_u64()?;
+                    self.stack.push(value as u64)?;
+                }
+                Opcode::I64LoadC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.read_u64()?
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.read_u64()?
+                        }
+                    };
+
+                    self.stack.push(value)?;
+                }
+                Opcode::F32Load => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+
+                    // Read f32 value and convert it to f64 then cast bytes to u64 and push to stack
+                    let value = self.glob_data.read_f32()? as f64;
+                    let bytes_as_u64 = u64::from_le_bytes(value.to_le_bytes());
+                    self.stack.push(bytes_as_u64)?;
+                }
+                Opcode::F32LoadC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.read_f32()?
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.read_f32()?
+                        }
+                    };
+
+                    // Read f32 value and convert it to f64 then cast bytes to u64 and push to stack
+                    let bytes_as_u64 = u64::from_le_bytes((value as f64).to_le_bytes());
+                    self.stack.push(bytes_as_u64)?;
+                }
+                Opcode::F64Load => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+
+                    // Read f64 representation as u64 and push to stack bytes
+                    let value = self.glob_data.read_u64()?;
+                    self.stack.push(value)?;
+                }
+                Opcode::F64LoadC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.read_u64()?
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.read_u64()?
+                        }
+                    };
+
+                    // Read f64 representation as u64 and push to stack bytes
+                    self.stack.push(value)?;
+                }
+                Opcode::I8Store => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    let value = self.stack.pop()?;
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    self.glob_data.write_u8(value as u8)?;
+                }
+                Opcode::I8StoreC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = self.stack.pop()?;
+                    match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.write_u8(value as u8)?;
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.write_u8(value as u8)?;
+                        }
+                    };
+                }
+                Opcode::I16Store => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    let value = self.stack.pop()?;
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    self.glob_data.write_u16(value as u16)?;
+                }
+                Opcode::I16StoreC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = self.stack.pop()?;
+                    match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.write_u16(value as u16)?;
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.write_u16(value as u16)?;
+                        }
+                    };
+                }
+                Opcode::I32Store => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    let value = self.stack.pop()?;
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    self.glob_data.write_u32(value as u32)?;
+                }
+                Opcode::I32StoreC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = self.stack.pop()?;
+                    match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.write_u32(value as u32)?;
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.write_u32(value as u32)?;
+                        }
+                    };
+                }
+                Opcode::I64Store => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    let value = self.stack.pop()?;
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    self.glob_data.write_u64(value as u64)?;
+                }
+                Opcode::I64StoreC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = self.stack.pop()?;
+                    match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.write_u64(value as u64)?;
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.write_u64(value as u64)?;
+                        }
+                    };
+                }
+                Opcode::F32Store => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    // Read u64 representation of float, convert to f64 and then cast to f32 and write bytes
+                    let value = self.stack.pop()?;
+                    let float_value = f64::from_le_bytes(value.to_le_bytes());
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    self.glob_data.write_f32(float_value as f32)?;
+                }
+                Opcode::F32StoreC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = self.stack.pop()?;
+                    let float_value = f64::from_le_bytes(value.to_le_bytes());
+
+                    match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.write_f32(float_value as f32)?;
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.write_f32(float_value as f32)?;
+                        }
+                    };
+                }
+                Opcode::F64Store => {
+                    let glob_idx = self.code.read_u32()?;
+                    let glob_ref = match self.glob_refs.get(glob_idx as usize) {
+                        Some(glob_ref) => glob_ref,
+                        None => return Err(String::from(format!("Unexpected glob idx '{:X}'", glob_idx)))
+                    };
+
+                    // Read u64 representation of float and just write those bytes
+                    let value = self.stack.pop()?;
+                    self.glob_data.set_current_byte_idx(glob_ref.offset as usize);
+                    self.glob_data.write_u64(value)?;
+                }
+                Opcode::F64StoreC => {
+                    let mut address = self.stack.pop()? as usize;
+                    let value = self.stack.pop()?;
+                    let float_value = f64::from_le_bytes(value.to_le_bytes());
+
+                    match address >= self.glob_data_size {
+                        true => {
+                            address = address - self.glob_data_size;
+                            if address >= self.heap_size as usize {
+                                return Err(String::from("Heap overflow"));
+                            }
+                            self.heap.set_current_byte_idx(address);
+                            self.heap.write_f64(float_value)?;
+                        }
+                        false => {
+                            self.glob_data.set_current_byte_idx(address);
+                            self.glob_data.write_f64(float_value)?;
+                        }
+                    };
+                }
+                Opcode::I64Eqz => {
+                    let value = self.stack.pop()?;
+                    let offset = self.code.read_u64()?;
+                    if value != 0 {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64Eq => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    let offset = self.code.read_u64()?;
+                    if lhs != rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64Ne => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    let offset = self.code.read_u64()?;
+                    if lhs == rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64LtS => {
+                    let lhs = self.stack.pop()? as i64;
+                    let rhs = self.stack.pop()? as i64;
+                    let offset = self.code.read_u64()?;
+                    if lhs >= rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64LtU => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    let offset = self.code.read_u64()?;
+                    if lhs >= rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64GtS => {
+                    let lhs = self.stack.pop()? as i64;
+                    let rhs = self.stack.pop()? as i64;
+                    let offset = self.code.read_u64()?;
+                    if lhs <= rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64GtU => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    let offset = self.code.read_u64()?;
+                    if lhs <= rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64LeS => {
+                    let lhs = self.stack.pop()? as i64;
+                    let rhs = self.stack.pop()? as i64;
+                    let offset = self.code.read_u64()?;
+                    if lhs > rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64LeU => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    let offset = self.code.read_u64()?;
+                    if lhs > rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64GeS => {
+                    let lhs = self.stack.pop()? as i64;
+                    let rhs = self.stack.pop()? as i64;
+                    let offset = self.code.read_u64()?;
+                    if lhs < rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64GeU => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    let offset = self.code.read_u64()?;
+                    if lhs < rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::F64Eq => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let offset = self.code.read_u64()?;
+                    if lhs != rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::F64Ne => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let offset = self.code.read_u64()?;
+                    if lhs == rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::F64Lt => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let offset = self.code.read_u64()?;
+                    if lhs >= rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::F64Gt => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let offset = self.code.read_u64()?;
+                    if lhs <= rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::F64Le => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let offset = self.code.read_u64()?;
+                    if lhs > rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::F64Ge => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let offset = self.code.read_u64()?;
+                    if lhs < rhs {
+                        let program_counter = self.code.get_current_byte_idx();
+                        self.code.set_current_byte_idx(program_counter + offset as usize);
+                    }
+                }
+                Opcode::I64Add => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs + rhs)?;
+                }
+                Opcode::I64Sub => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs - rhs)?;
+                }
+                Opcode::I64Mul => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs * rhs)?;
+                }
+                Opcode::I64DivS => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(((lhs as i64) / (rhs as i64)) as u64)?;
+                }
+                Opcode::I64DivU => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs / rhs)?;
+                }
+                Opcode::I64RemS => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(((lhs as i64) % (rhs as i64)) as u64)?;
+                }
+                Opcode::I64RemU => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs % rhs)?;
+                }
+                Opcode::I64Pow => {
+                    let value = self.stack.pop()?;
+                    let pow = self.stack.pop()?;
+                    self.stack.push(u64::pow(value, pow as u32))?;
+                }
+                Opcode::I64Abs => {
+                    let value = self.stack.pop()?;
+                    self.stack.push((value as i64).abs() as u64)?;
+                }
+                Opcode::I64Sqrt => {
+                    let value = self.stack.pop()?;
+                    let float_value = f64::from_le_bytes(value.to_le_bytes());
+                    let result = float_value.sqrt();
+                    self.stack.push(u64::from_le_bytes(result.to_le_bytes()))?;
+                }
+                Opcode::I64And => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs & rhs)?;
+                }
+                Opcode::I64Or => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs | rhs)?;
+                }
+                Opcode::I64Xor => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs ^ rhs)?;
+                }
+                Opcode::I64Shl => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs << rhs)?;
+                }
+                Opcode::I64ShrS => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    match (lhs as i64) < 0 {
+                        true => self.stack.push(0x8000000000000000 | lhs >> rhs)?,
+                        false => self.stack.push(lhs >> rhs)?
+                    };
+                }
+                Opcode::I64ShrU => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs >> rhs)?;
+                }
+                Opcode::I64Rotl => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs << rhs | lhs >> (64 - rhs))?;
+                }
+                Opcode::I64Rotr => {
+                    let lhs = self.stack.pop()?;
+                    let rhs = self.stack.pop()?;
+                    self.stack.push(lhs >> rhs | lhs << (64 - rhs))?;
+                }
+                Opcode::F64Add => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes((lhs + rhs).to_le_bytes()))?;
+                }
+                Opcode::F64Sub => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes((lhs - rhs).to_le_bytes()))?;
+                }
+                Opcode::F64Mul => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes((lhs * rhs).to_le_bytes()))?;
+                }
+                Opcode::F64Div => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes((lhs / rhs).to_le_bytes()))?;
+                }
+                Opcode::F64Pow => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    let rhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes((lhs % rhs).to_le_bytes()))?;
+                }
+                Opcode::F64Abs => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes(lhs.abs().to_le_bytes()))?;
+                }
+                Opcode::F64Ceil => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes(lhs.ceil().to_le_bytes()))?;
+                }
+                Opcode::F64Floor => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes(lhs.floor().to_le_bytes()))?;
+                }
+                Opcode::F64Trunc => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes(lhs.trunc().to_le_bytes()))?;
+                }
+                Opcode::F64Nearest => {
+                    return Err(String::from(format!("Unimplemented instruction F64Nearest")));
+                }
+                Opcode::F64Sqrt => {
+                    let lhs = f64::from_le_bytes(self.stack.pop()?.to_le_bytes());
+                    self.stack.push(u64::from_le_bytes(lhs.sqrt().to_le_bytes()))?;
+                }
                 unknown => {
-                    return Err(String::from(format!("Unimplemented instruction '{:X}'", unknown as u8)))
+                    return Err(String::from(format!("Unimplemented instruction '{:X}'", unknown as u8)));
                 }
             }
         }

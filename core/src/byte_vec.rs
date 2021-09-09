@@ -17,14 +17,22 @@
 // along with Archmage. If not, see <https://www.gnu.org/licenses/>.
 //
 
-pub struct ByteVecReader {
+pub struct ByteVec {
     byte_vec: Vec<u8>,
     current_byte_idx: usize,
 }
 
-impl ByteVecReader {
-    pub fn new(byte_vec: Vec<u8>) -> ByteVecReader {
-        ByteVecReader { byte_vec, current_byte_idx: 0 }
+impl ByteVec {
+    pub fn new(byte_vec: Vec<u8>) -> ByteVec {
+        ByteVec { byte_vec, current_byte_idx: 0 }
+    }
+
+    pub fn len(&self) -> usize {
+        self.byte_vec.len()
+    }
+
+    pub fn resize(&mut self, len: usize) {
+        self.byte_vec.resize(len, 0);
     }
 
     pub fn set_current_byte_idx(&mut self, current_byte_idx: usize) {
@@ -74,5 +82,46 @@ impl ByteVecReader {
             self.read_u8()?, self.read_u8()?, self.read_u8()?, self.read_u8()?
         ];
         Ok(f64::from_le_bytes(bytes))
+    }
+
+    pub fn write_u8(&mut self, value: u8) -> Result<(), String> {
+        if self.current_byte_idx >= self.len() {
+            return Err(String::from("Index out of bounds"));
+        }
+        self.byte_vec[self.current_byte_idx] = value;
+        self.current_byte_idx += 1;
+        Ok(())
+    }
+
+    pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), String> {
+        for b in bytes {
+            self.write_u8(*b)?;
+        }
+        Ok(())
+    }
+
+    pub fn write_u16(&mut self, value: u16) -> Result<(), String> {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes)
+    }
+
+    pub fn write_u32(&mut self, value: u32) -> Result<(), String> {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes)
+    }
+
+    pub fn write_u64(&mut self, value: u64) -> Result<(), String> {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes)
+    }
+
+    pub fn write_f32(&mut self, value: f32) -> Result<(), String> {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes)
+    }
+
+    pub fn write_f64(&mut self, value: f64) -> Result<(), String> {
+        let bytes = value.to_le_bytes();
+        self.write_bytes(&bytes)
     }
 }

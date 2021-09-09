@@ -21,4 +21,4 @@ pub mod opcodes;
 pub mod bin_structs;
 pub mod ser_des;
 pub mod bin_utils;
-pub mod byte_vec_reader;
+pub mod byte_vec;

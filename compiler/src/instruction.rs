@@ -20,7 +20,7 @@
 use core::opcodes::Opcode;
 
 use crate::out_bin::OutBin;
-use core::byte_vec_reader::ByteVecReader;
+use core::byte_vec::ByteVec;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
@@ -55,7 +55,7 @@ impl Instruction {
     }
 
     pub fn decode(
-        reader: &mut ByteVecReader,
+        reader: &mut ByteVec,
         func_name_map: &HashMap<u32, String>,
         glob_name_map: &HashMap<u32, String>
     ) -> Result<(Instruction, usize), String> {
@@ -170,23 +170,74 @@ impl Instruction {
                 Literal::Glob(glob_name.clone())
             }
             Opcode::F64StoreC => Literal::None(),
-            Opcode::I64Eqz => Literal::None(),
-            Opcode::I64Eq => Literal::None(),
-            Opcode::I64Ne => Literal::None(),
-            Opcode::I64LtS => Literal::None(),
-            Opcode::I64LtU => Literal::None(),
-            Opcode::I64GtS => Literal::None(),
-            Opcode::I64GtU => Literal::None(),
-            Opcode::I64LeS => Literal::None(),
-            Opcode::I64LeU => Literal::None(),
-            Opcode::I64GeS => Literal::None(),
-            Opcode::I64GeU => Literal::None(),
-            Opcode::F64Eq => Literal::None(),
-            Opcode::F64Ne => Literal::None(),
-            Opcode::F64Lt => Literal::None(),
-            Opcode::F64Gt => Literal::None(),
-            Opcode::F64Le => Literal::None(),
-            Opcode::F64Ge => Literal::None(),
+            Opcode::I64Eqz => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64Eq => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64Ne => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64LtS => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64LtU => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64GtS => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64GtU => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64LeS => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64LeU => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64GeS => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::I64GeU => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::F64Eq => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::F64Ne => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::F64Lt => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::F64Gt =>{
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::F64Le =>{
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
+            Opcode::F64Ge => {
+                let jump_offset = reader.read_u64()?;
+                Literal::Offset(jump_offset)
+            },
             Opcode::I64Add => Literal::None(),
             Opcode::I64Sub => Literal::None(),
             Opcode::I64Mul => Literal::None(),
