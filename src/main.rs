@@ -17,11 +17,8 @@
 // along with Archmage. If not, see <https://www.gnu.org/licenses/>.
 //
 
-use std::io::BufReader;
-use std::fs::File;
+mod memory;
 
-pub trait SerDes<T> {
-    fn deserialize(reader: &mut BufReader<File>) -> Result<T, String>;
+fn main() {
 
-    fn serialize(&self) -> Vec<u8>;
 }
