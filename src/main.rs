@@ -19,6 +19,41 @@
 
 mod memory;
 
-fn main() {
+use std::env;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
+use shard_vm::vm::VM;
+use crate::memory::MachineMemory;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("archmage [kernel.bin]");
+        return;
+    }
+
+    let kernel_file = args[1].clone();
+    let mut kernel_bytes = match read_file_bytes(&kernel_file) {
+        Ok(kernel_bytes) => kernel_bytes,
+        Err(err) => {
+            println!("{}", err);
+            return;
+        }
+    };
+
+    let vm = VM::new(Box::new(MachineMemory::new(kernel_bytes)));
+}
+
+fn read_file_bytes(file_path: &String) -> Result<Vec<u8>, String> {
+    if !Path::new(file_path).exists() {
+        return Err(String::from(format!("'{}' doesn't exist", file_path)));
+    }
+
+    let mut reader = File::open(file_path).expect("Failed to open file");
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes).expect("Failed to read file");
+
+    Ok(bytes)
 }

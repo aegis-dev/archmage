@@ -20,7 +20,13 @@
 use shard_vm::memory::Memory;
 
 pub const STACK_START: u16 = 0xfeff;
-pub const VIDEO_MODE_ADDRESS: u16 = 0x // TODO:
+pub const STACK_SIZE: u16 = 0xff;
+
+pub const VIDEO_BUFFER_WIDTH: u8 = 320;
+pub const VIDEO_BUFFER_HEIGHT: u8 = 200;
+pub const VIDEO_RAM_SIZE: u16 = (VIDEO_BUFFER_WIDTH as u16 / 2) * (VIDEO_BUFFER_HEIGHT as u16 / 2);
+pub const VIDEO_RAM_START: u16 = STACK_START - VIDEO_RAM_SIZE;
+pub const VIDEO_MODE_ADDRESS: u16 = VIDEO_RAM_START - 1;
 
 pub struct MachineMemory {
     memory: Vec<u8>,
