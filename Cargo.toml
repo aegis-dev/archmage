@@ -6,5 +6,6 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+num_enum = "0.5.1"
 flask = { path = "libs/flask" }
 shard_vm = { path = "libs/shard_lang/shard_vm" }

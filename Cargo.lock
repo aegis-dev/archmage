@@ -28,6 +28,7 @@ name = "archmage"
 version = "0.1.0"
 dependencies = [
  "flask",
+ "num_enum",
  "shard_vm",
 ]
 

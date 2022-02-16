@@ -22,9 +22,9 @@ use shard_vm::memory::Memory;
 pub const STACK_START: u16 = 0xfeff;
 pub const STACK_SIZE: u16 = 0xff;
 
-pub const VIDEO_BUFFER_WIDTH: u8 = 320;
-pub const VIDEO_BUFFER_HEIGHT: u8 = 200;
-pub const VIDEO_RAM_SIZE: u16 = (VIDEO_BUFFER_WIDTH as u16 / 2) * (VIDEO_BUFFER_HEIGHT as u16 / 2);
+pub const VIDEO_BUFFER_WIDTH: u16 = 256;
+pub const VIDEO_BUFFER_HEIGHT: u16 = 224;
+pub const VIDEO_RAM_SIZE: u16 = (VIDEO_BUFFER_WIDTH / 2) * (VIDEO_BUFFER_HEIGHT / 2);
 pub const VIDEO_RAM_START: u16 = STACK_START - VIDEO_RAM_SIZE;
 pub const VIDEO_MODE_ADDRESS: u16 = VIDEO_RAM_START - 1;
 
@@ -35,7 +35,8 @@ pub struct MachineMemory {
 
 impl MachineMemory {
     pub fn new(kernel_code: Vec<u8>) -> Result<MachineMemory, String> {
-        if kernel_code.len() >= u16::MAX as usize {
+        let kernel_size = kernel_code.len();
+        if kernel_size >= u16::MAX as usize {
             return Err(String::from(format!("Kernel code exceeds {} size limit", u16::MAX)));
         }
 
@@ -44,9 +45,9 @@ impl MachineMemory {
         memory.append(&mut padding);
         assert_eq!(memory.len(), u16::MAX as usize);
 
-        Ok(MachineMemory{
+        Ok(MachineMemory {
             memory,
-            writable_memory_start: kernel_code.len() as u16
+            writable_memory_start: kernel_size as u16,
         })
     }
 }
@@ -57,12 +58,12 @@ impl Memory for MachineMemory {
             return Err(String::from("ABORTING: attempting to write into read-only memory"))
         }
 
-        self.memory[address] = value;
+        self.memory[address as usize] = value;
         Ok(())
     }
 
     fn read_u8(&self, address: u16) -> Result<u8, String> {
-        Ok(self.memory[address])
+        Ok(self.memory[address as usize])
     }
 
     fn stack_start_address(&self) -> u16 {
@@ -72,5 +73,9 @@ impl Memory for MachineMemory {
 
     fn dump_memory(&self) -> Vec<u8> {
         self.memory.clone()
+    }
+
+    fn dump_memory_range(&self, start: u16, end: u16) -> Vec<u8> {
+        self.memory[start as usize..=end as usize].to_vec()
     }
 }
