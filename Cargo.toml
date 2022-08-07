@@ -9,3 +9,7 @@ edition = "2018"
 num_enum = "0.5.1"
 flask = { path = "libs/flask" }
 shard_vm = { path = "libs/shard_lang/shard_vm" }
+
+[dependencies.sdl2]
+version = "0.35.2"
+features = ["bundled", "static-link"]

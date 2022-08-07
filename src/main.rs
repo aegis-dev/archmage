@@ -1,5 +1,5 @@
 //
-// Copyright © 2020-2021  Egidijus Lileika
+// Copyright © 2020-2022  Egidijus Lileika
 //
 // This file is part of Archmage - Fantasy Virtual Machine
 //
@@ -21,6 +21,7 @@ mod memory;
 mod sys_call;
 mod palette;
 mod video_mode;
+mod input;
 
 use std::env;
 use std::fs::File;
@@ -28,12 +29,15 @@ use std::io::Read;
 use std::path::Path;
 use std::convert::TryFrom;
 
-use shard_vm::vm::{VM, ExecutionStatus};
-use flask::flask_context::FlaskContext;
+use shard_vm::vm::{
+    VM, ExecutionStatus
+};
 
-use crate::memory::{MachineMemory, VIDEO_BUFFER_WIDTH, VIDEO_BUFFER_HEIGHT, VIDEO_MODE_ADDRESS, VIDEO_RAM_START, VIDEO_RAM_SIZE};
-use crate::sys_call::SysCall;
+use flask::flask_context::FlaskContext;
 use flask::frame_buffer::FrameBuffer;
+
+use crate::memory::{MachineMemory, VIDEO_BUFFER_WIDTH, VIDEO_BUFFER_HEIGHT, VIDEO_MODE, VIDEO_BUFFER_START, VIDEO_BUFFER_SIZE, STACK_START, STACK_SIZE, CURSOR_POSITION_Y, CURSOR_POSITION_X};
+use crate::sys_call::SysCall;
 use crate::video_mode::VideoMode;
 
 fn main() {
@@ -45,10 +49,49 @@ fn main() {
     }
 }
 
+fn print_help() {
+    println!("archmage [kernel.bin]");
+    println!("archmage --help");
+    println!("archmage --sys-info");
+}
+
+fn print_sys_info() {
+    println!("--------------------- CPU ----------------------");
+    println!("8 bit execution mode");
+    println!("16 bit addressing");
+    println!("Powered by shard_lang - toy assembly language and VM");
+    println!();
+    println!("----------------- Screen size ------------------");
+    println!("VIDEO_BUFFER_WIDTH    {0} | 0x{1:x}", VIDEO_BUFFER_WIDTH, VIDEO_BUFFER_WIDTH);
+    println!("VIDEO_BUFFER_HEIGHT   {0} | 0x{1:x}", VIDEO_BUFFER_HEIGHT, VIDEO_BUFFER_HEIGHT);
+    println!("VIDEO_BUFFER_SIZE     {0} | 0x{1:x}", VIDEO_BUFFER_SIZE, VIDEO_BUFFER_SIZE);
+    println!();
+    println!("---------------- Memory Layout -----------------");
+    println!("STACK_START           0x{0:x} - 0x{1:x}", STACK_START, STACK_START + STACK_SIZE);
+    println!("VIDEO_BUFFER_START    0x{0:x} - 0x{1:x}", VIDEO_BUFFER_START, VIDEO_BUFFER_START + VIDEO_BUFFER_SIZE);
+    println!("VIDEO_MODE            0x{0:x}", VIDEO_MODE);
+    println!("CURSOR_POSITION_Y     0x{0:x}", CURSOR_POSITION_Y);
+    println!("CURSOR_POSITION_X     0x{0:x}", CURSOR_POSITION_X);
+    println!();
+    println!("------------------------------------------------");
+}
+
 pub fn run_machine() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        return Err(String::from("archmage [kernel.bin]"));
+        print_help();
+        return Ok(());
+    }
+
+    if args[1] == "--help" {
+        print_help();
+        return Ok(());
+    } else if args[1] == "--sys-info" {
+        print_sys_info();
+        return Ok(());
+    } else if args[1].starts_with("-") {
+        print_help();
+        return Ok(());
     }
 
     let kernel_file = args[1].clone();
@@ -83,9 +126,6 @@ pub fn run_machine() -> Result<(), String> {
     let mut vm = VM::new(memory);
 
     loop {
-        let input = flask_context.poll_input_events();
-        // todo: figure out archmage input
-
         let status = match vm.execute_instruction() {
             Ok(status) => status,
             Err(err) => {
@@ -109,12 +149,12 @@ pub fn run_machine() -> Result<(), String> {
         match sys_call {
             SysCall::None => { }
             SysCall::RenderVRAM => {
-                let video_mode = match VideoMode::try_from(vm.peek_memory(VIDEO_MODE_ADDRESS).unwrap()) {
+                let video_mode = match VideoMode::try_from(vm.peek_memory(VIDEO_MODE).unwrap()) {
                     Ok(video_mode) => video_mode,
                     Err(_) => VideoMode::Pixel
                 };
 
-                let vram = vm.dump_memory_range(VIDEO_RAM_START, VIDEO_RAM_START + VIDEO_RAM_SIZE);
+                let vram = vm.dump_memory_range(VIDEO_BUFFER_START, VIDEO_BUFFER_START + VIDEO_BUFFER_SIZE);
 
                 match video_mode {
                     VideoMode::Pixel => {
@@ -137,9 +177,28 @@ pub fn run_machine() -> Result<(), String> {
 
                 flask_context.render_buffer_and_swap(&custom_frame_buffer)?;
             }
-            SysCall::PollKeyboardInput => {}
-            SysCall::GetCursorState => {}
-            SysCall::GetMouseButtonState => {}
+            SysCall::PollInputEvents => {
+                // Polling input events. If there are any key input press events pushed to the stack,
+                // we also push 0x01 to the stack, otherwise, pushing 0x00.
+                match flask_context.poll_sdl_input_event() {
+                    Some(event) => {
+                        match input::process_sdl_event(&mut vm, &event)? {
+                            Some(_) => {
+                                vm.stack_push(0x01)?;
+                            }
+                            None => {
+                                vm.stack_push(0x00)?;
+                            }
+                        }
+                    }
+                    None => {
+                        vm.stack_push(0x00)?;
+                    }
+                }
+
+            }
+            // SysCall::UpdateCursorState => {}
+            // SysCall::GetMouseButtonState => {}
         }
     }
 }

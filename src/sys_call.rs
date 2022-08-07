@@ -1,5 +1,5 @@
 //
-// Copyright © 2020-2021  Egidijus Lileika
+// Copyright © 2020-2022  Egidijus Lileika
 //
 // This file is part of Archmage - Fantasy Virtual Machine
 //
@@ -24,7 +24,7 @@ use num_enum::TryFromPrimitive;
 pub enum SysCall {
     None = 0x00,
     RenderVRAM = 0x01,
-    PollKeyboardInput = 0x02,
-    GetCursorState = 0x03,
-    GetMouseButtonState= 0x04,
+    PollInputEvents = 0x02,
+    // UpdateCursorState = 0x03,
+    // GetMouseButtonState= 0x04,
 }

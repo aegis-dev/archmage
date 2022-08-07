@@ -1,0 +1,28 @@
+;
+; Copyright © 2020-2022  Egidijus Lileika
+;
+; This file is part of Archmage - Fantasy Virtual Machine
+;
+; Archmage is free software: you can redistribute it and/or modify
+; it under the terms of the GNU General Public License as published by
+; the Free Software Foundation, either version 3 of the License, or
+; (at your option) any later version.
+;
+; Archmage is distributed in the hope that it will be useful,
+; but WITHOUT ANY WARRANTY; without even the implied warranty of
+; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+; GNU General Public License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with shard_lang. If not, see <https://www.gnu.org/licenses/>.
+;
+
+VIDEO_BUFFER_WIDTH: 0xfe
+VIDEO_BUFFER_HEIGHT: 0x8e
+VIDEO_BUFFER_SIZE: 0x72 0x46
+
+STACK_START: 0x00 0xff
+VIDEO_BUFFER_START: 0x8d 0xb8
+VIDEO_MODE: 0x8c 0xb8
+CURSOR_POSITION_Y: 0x8b 0xb8
+CURSOR_POSITION_X: 0x8a 0xb8

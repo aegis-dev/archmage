@@ -1,5 +1,5 @@
 //
-// Copyright © 2020-2021  Egidijus Lileika
+// Copyright © 2020-2022  Egidijus Lileika
 //
 // This file is part of Archmage - Fantasy Virtual Machine
 //
@@ -19,14 +19,21 @@
 
 use shard_vm::memory::Memory;
 
-pub const STACK_START: u16 = 0xfeff;
+pub const VIDEO_BUFFER_WIDTH: u8 = 254;
+pub const VIDEO_BUFFER_HEIGHT: u8 = 142;
+
+pub const ADDRESSABLE_MEMORY_SIZE: usize = u16::MAX as usize + 1;
+
+// Memory layout
+pub const STACK_START: u16 = 0xff00;
 pub const STACK_SIZE: u16 = 0xff;
 
-pub const VIDEO_BUFFER_WIDTH: u16 = 256;
-pub const VIDEO_BUFFER_HEIGHT: u16 = 224;
-pub const VIDEO_RAM_SIZE: u16 = (VIDEO_BUFFER_WIDTH / 2) * (VIDEO_BUFFER_HEIGHT / 2);
-pub const VIDEO_RAM_START: u16 = STACK_START - VIDEO_RAM_SIZE;
-pub const VIDEO_MODE_ADDRESS: u16 = VIDEO_RAM_START - 1;
+pub const VIDEO_BUFFER_START: u16 = STACK_START - VIDEO_BUFFER_SIZE - 1;
+pub const VIDEO_BUFFER_SIZE: u16 = VIDEO_BUFFER_WIDTH as u16 * VIDEO_BUFFER_HEIGHT as u16 / 2;
+
+pub const VIDEO_MODE: u16 = VIDEO_BUFFER_START - 1;
+pub const CURSOR_POSITION_Y: u16 = VIDEO_MODE - 1;
+pub const CURSOR_POSITION_X: u16 = CURSOR_POSITION_Y - 1;
 
 pub struct MachineMemory {
     memory: Vec<u8>,
@@ -36,14 +43,14 @@ pub struct MachineMemory {
 impl MachineMemory {
     pub fn new(kernel_code: Vec<u8>) -> Result<MachineMemory, String> {
         let kernel_size = kernel_code.len();
-        if kernel_size >= u16::MAX as usize {
-            return Err(String::from(format!("Kernel code exceeds {} size limit", u16::MAX)));
+        if kernel_size >= ADDRESSABLE_MEMORY_SIZE {
+            return Err(String::from(format!("Kernel code exceeds {} size limit", ADDRESSABLE_MEMORY_SIZE)));
         }
 
         let mut memory = kernel_code;
-        let mut padding = vec![0 as u8; u16::MAX as usize - memory.len()];
+        let mut padding = vec![0 as u8; ADDRESSABLE_MEMORY_SIZE - memory.len()];
         memory.append(&mut padding);
-        assert_eq!(memory.len(), u16::MAX as usize);
+        assert_eq!(memory.len(), ADDRESSABLE_MEMORY_SIZE);
 
         Ok(MachineMemory {
             memory,
@@ -67,7 +74,6 @@ impl Memory for MachineMemory {
     }
 
     fn stack_start_address(&self) -> u16 {
-        // At the very end of whole memory
         STACK_START
     }
 
