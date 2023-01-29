@@ -1,6 +1,3 @@
-[submodule "libs/shard_lang"]
-	path = libs/shard_lang
-	url = https://github.com/aegis-dev/shard_lang.git
 [submodule "libs/flask"]
 	path = libs/flask
 	url = https://github.com/aegis-dev/flask.git
