@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8" />
+        <title>Archmage - Fantasy Virtual Machine</title>
+        <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    </head>
+    <body>
+        <div>
+            <input type="file" id="kernel_upload">
+        </div>
+        <div>
+            <canvas id="canvas" height="960" width="540"></canvas>
+        </div>
+        <script type="module">
+            import init from "./pkg/archmage.js";
+
+            document.getElementById('kernel_upload').addEventListener('change', handleKernelLoad, false);
+
+            function handleKernelLoad(event) {
+                const reader = new FileReader()
+                reader.onload = start;
+                reader.readAsArrayBuffer(event.target.files[0]);
+                document.getElementById('kernel_upload').style.display = 'none';
+            }
+
+            function start(event) {
+                window.kernel = new Uint8Array(event.target.result);
+                console.log(window.kernel);
+                init();
+            }
+        </script>
+    </body>
+</html>

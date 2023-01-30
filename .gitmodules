@@ -1,3 +1,6 @@
 [submodule "libs/flask"]
 	path = libs/flask
 	url = https://github.com/aegis-dev/flask.git
+[submodule "libs/shard_lang"]
+	path = libs/shard_lang
+	url = git@github.com:aegis-dev/shard_lang.git

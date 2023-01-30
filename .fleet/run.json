@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "command",
+            "name": "build",
+            "program": "wasm-pack",
+            "args": ["build", "--target", "web"],
+        },
+        {
+            "type": "command",
+            "name": "serve",
+            "program": "python",
+            "args": ["-m", "http.server"],
+        },
+        {
+            "type": "command",
+            "name": "build kernel",
+            "program": "shardc.exe",
+            "args": ["os/kernel.srd"],
+        }
+    ]
+}

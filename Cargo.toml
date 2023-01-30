@@ -2,14 +2,21 @@
 name = "archmage"
 version = "0.1.0"
 authors = ["Egidijus Lileika <lileikaa@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 num_enum = "0.5.1"
-flask = { path = "libs/flask" }
 shard_vm = { path = "libs/shard_lang/shard_vm" }
+flask = { path = "libs/flask" }
+wasm-bindgen = "0.2.83"
+js-sys = "0.3.60"
 
-[dependencies.sdl2]
-version = "0.35.2"
-features = ["bundled", "static-link"]
+[dependencies.web-sys]
+version = "0.3.60"
+features = [
+    'Window',
+]
+
+[lib]
+crate-type = ["cdylib"]
