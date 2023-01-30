@@ -4,7 +4,7 @@
             "type": "command",
             "name": "build",
             "program": "wasm-pack",
-            "args": ["build", "--target", "web"],
+            "args": ["build", "--target", "web", "--release"],
         },
         {
             "type": "command",

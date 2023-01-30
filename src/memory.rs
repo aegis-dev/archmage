@@ -21,8 +21,8 @@ use shard_vm::{memory::Memory, vm::VM_MAX_IMAGE_SIZE};
 
 pub const IMAGE_SIZE: usize = VM_MAX_IMAGE_SIZE;
 
-pub const VIDEO_BUFFER_WIDTH: u16 = 256;
-pub const VIDEO_BUFFER_HEIGHT: u16 = 144;
+pub const VIDEO_BUFFER_WIDTH: u8 = 252;
+pub const VIDEO_BUFFER_HEIGHT: u8 = 140;
 
 // Memory layout
 pub const STACK_START: u16 = 0xff00;
@@ -32,7 +32,7 @@ pub const CALL_STACK_START: u16 = STACK_START - CALL_STACK_SIZE;
 pub const CALL_STACK_SIZE: u16 = u8::MAX as u16 + 1;
 
 pub const VIDEO_BUFFER_START: u16 = CALL_STACK_START - VIDEO_BUFFER_SIZE;
-pub const VIDEO_BUFFER_SIZE: u16 = VIDEO_BUFFER_WIDTH * VIDEO_BUFFER_HEIGHT / 2;
+pub const VIDEO_BUFFER_SIZE: u16 = VIDEO_BUFFER_WIDTH as u16 * VIDEO_BUFFER_HEIGHT as u16 / 2;
 
 pub const VIDEO_MODE: u16 = VIDEO_BUFFER_START - 1;
 pub const CURSOR_POSITION_Y: u16 = VIDEO_MODE - 1;
@@ -60,6 +60,22 @@ impl MachineMemory {
         let mut ram = vec![0 as u8; IMAGE_SIZE - memory.len()];
         memory.append(&mut ram);
         assert_eq!(memory.len(), IMAGE_SIZE);
+
+        // TODO: Testing, remove lated
+        let mut color_idx: u8 = 0;
+        let mut vram_addr = VIDEO_BUFFER_START as usize;
+        for _ in 0..(VIDEO_BUFFER_HEIGHT as u32 * VIDEO_BUFFER_WIDTH as u32) / 2 {
+            let pixel_1 = color_idx;
+            let pixel_2 = color_idx + 1;
+            color_idx += 2;
+
+            memory[vram_addr] = pixel_1 | (pixel_2 << 4);
+            vram_addr += 1;
+
+            if color_idx == 16 {
+                color_idx = 0;
+            }
+        }
 
         Ok(MachineMemory {
             memory,

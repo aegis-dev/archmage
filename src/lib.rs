@@ -111,23 +111,9 @@ pub fn run_machine() -> Result<(), String> {
 
     let mut vm = VM::new_with_custom_memory(memory);
 
-//    loop {
-//        let status = vm.execute_instruction()?;
-//        let sys_call = match status {
-//            ExecutionStatus::Continue => continue,
-//            ExecutionStatus::Done => return Ok(()),
-//            ExecutionStatus::SysCall => {
-//                interrupts::interrupt_handler(&mut vm, InterruptType::SysCall, &mut flask_context, &mut frame_buffer);
-//            },
-//            ExecutionStatus::Breakpoint => {
-//                interrupts::interrupt_handler(&mut vm, InterruptType::Breakpoint, &mut flask_context, &mut frame_buffer);
-//            },
-//        };
-//    }
-
+    // Not the most elegant way but this creates closure which is moving whole scope of this method
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
-
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         if let Err(err) = update(&mut vm, &mut flask_context, &mut frame_buffer) {
             flask::log(format!("{}", err).as_str());

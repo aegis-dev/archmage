@@ -6,11 +6,11 @@
         <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     </head>
     <body>
-        <div>
+        <div align="center">
             <input type="file" id="kernel_upload">
         </div>
-        <div>
-            <canvas id="canvas" height="960" width="540"></canvas>
+        <div align="center">
+            <canvas id="canvas" height="540" width="960"></canvas>
         </div>
         <script type="module">
             import init from "./pkg/archmage.js";
@@ -26,7 +26,6 @@
 
             function start(event) {
                 window.kernel = new Uint8Array(event.target.result);
-                console.log(window.kernel);
                 init();
             }
         </script>

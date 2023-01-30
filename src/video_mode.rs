@@ -22,6 +22,6 @@ use num_enum::TryFromPrimitive;
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, TryFromPrimitive)]
 pub enum VideoMode {
-    Pixel,
-    Text
+    Pixel   = 0x00,
+    Text    = 0x01
 }

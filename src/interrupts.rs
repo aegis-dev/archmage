@@ -74,13 +74,15 @@ fn syscall_handler(vm: &mut VM, flask_context: &mut FlaskContext, frame_buffer: 
 
             let vram = vm.dump_memory_range(VIDEO_BUFFER_START, VIDEO_BUFFER_START + VIDEO_BUFFER_SIZE);
 
+
+
             match video_mode {
                 VideoMode::Pixel => {
                     let mut column = 0;
                     let mut line = 0;
                     for duo_pixel in vram {
-                        frame_buffer.set_pixel(line, column, duo_pixel & 0x0f);
-                        frame_buffer.set_pixel(line, column + 1, (duo_pixel & 0xf0) >> 4);
+                        frame_buffer.set_pixel(column, line, duo_pixel & 0x0f);
+                        frame_buffer.set_pixel(column + 1, line, (duo_pixel & 0xf0) >> 4);
                         column += 2;
                         if column >= VIDEO_BUFFER_WIDTH as u32 {
                             column = 0;

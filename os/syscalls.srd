@@ -25,3 +25,9 @@ sys_write:
     push 0x02
     sys
     return
+
+; Params:
+sys_draw:
+    push 0x03
+    sys
+    return
